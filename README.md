@@ -29,3 +29,9 @@ Verificación
  │
  ├─ resultado válido → salida final
  └─ resultado débil → feedback → nueva iteración
+
+## Arquitectura del sistema
+
+La siguiente figura resume el flujo general del agente. El sistema recibe un CUI, consulta información estructurada del proyecto, busca criterios del Marco del Bono Sostenible del Perú 2021 y, cuando es necesario, revisa imágenes del marco lógico. Luego genera una clasificación estructurada, aplica validaciones y pasa por un verificador semántico. Si la salida no es suficientemente sólida, el sistema entrega feedback al agente para una nueva iteración.
+
+![Arquitectura del agente](assets/arquitectura_agente.png)
