@@ -18,3 +18,12 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+# Datos de universo filtrado 2023-2026: NO compartir la base de 121k CUIs
+data/*.sqlite
+data/*.sqlite*
+Data 23_26.xlsx
+Data 423 CUIs.xlsx
+.env
+.venv/
+outputs/
+__pycache__/

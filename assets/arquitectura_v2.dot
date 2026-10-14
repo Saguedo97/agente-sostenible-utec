@@ -1,0 +1,66 @@
+digraph v2 {
+  graph [rankdir=LR, bgcolor="#FFFFFF", pad="0.25", nodesep="0.24", ranksep="0.62", splines=spline,
+         label="INVESTIGADOR DE ELEGIBILIDAD SOSTENIBLE · ARQUITECTURA V2", labelloc=t, labeljust=l,
+         fontname="DejaVu Sans", fontsize=20, fontcolor="#123D34"];
+  node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", color="#B8C7C7", fillcolor="#F5F8F7", fontcolor="#193A3D", margin="0.14,0.12"];
+  edge [color="#5A8079", arrowsize=0.72, penwidth=1.2, fontname="DejaVu Sans", fontsize=8];
+
+  subgraph cluster_data {
+    label="01 · FUENTES DE DATOS";
+    style="rounded,filled";color="#CFE5DC";fillcolor="#F0F8F4";fontcolor="#245747";
+    historic [label="~500K proyectos\nUniverso histórico\n(contexto; no cargado)",fillcolor="#E2EFE9"];
+    filtered [label="121,477 CUIs\nXLSX 2023–2026",fillcolor="#E2EFE9"];
+    converter [label="Conversión streaming\nuna sola vez",fillcolor="#FFFFFF"];
+    index [label="SQLite local indexada\npor CODIGO_UNICO",fillcolor="#FFFFFF"];
+    labelled [label="423 CUIs\nPROYECTOS + BRECHAS",fillcolor="#E2EFE9"];
+    filtered -> converter -> index;
+    historic -> filtered [style=dotted,label="filtros externos"];
+  }
+
+  subgraph cluster_app {
+    label="02 · EXPERIENCIA";
+    style="rounded,filled";color="#D6DEED";fillcolor="#F0F4FA";fontcolor="#34547A";
+    user [label="Usuario\nIngresa CUI",fillcolor="#FFFFFF"];
+    ui [label="Streamlit V2\nConsulta · Plan · Evidencias\nExportación JSON",fillcolor="#DCE8F9",color="#A9BCE0"];
+    v1 [label="Motor V1\nBaseline clasificador",fillcolor="#FFFFFF"];
+    user -> ui;
+    ui -> v1 [style=dashed, label="comparación"];
+  }
+
+  subgraph cluster_agent {
+    label="03 · RUNTIME AGÉNTICO · LANGGRAPH";
+    style="rounded,filled";color="#BDD6D2";fillcolor="#EAF5F2";fontcolor="#1D5F53";
+    resolver [label="Resolver CUI\nfuente + ficha",fillcolor="#FFFFFF"];
+    supervisor [label="SUPERVISOR LLM\nGenera / revisa plan\nElige siguiente acción",color="#539A8C",fillcolor="#CDEFE4",penwidth=2];
+    rag [label="Normativa\nRAG Marco 2021",fillcolor="#FFFFFF"];
+    vision [label="Visión opcional\nMarco lógico",fillcolor="#FFFFFF"];
+    debate [label="Contraste opcional\nExperto normativo + técnico",fillcolor="#FFFFFF"];
+    synthesis [label="Diagnóstico preliminar\nBrechas documentales\nAcciones pendientes",color="#539A8C",fillcolor="#CDEFE4",penwidth=2];
+    resolver -> supervisor;
+    supervisor -> rag [label="decide"];
+    supervisor -> vision [label="decide"];
+    supervisor -> debate [label="decide"];
+    rag -> supervisor [label="observa",style=dashed];
+    vision -> supervisor [style=dashed];
+    debate -> supervisor [style=dashed];
+    supervisor -> synthesis [label="finaliza / límite"];
+  }
+
+  subgraph cluster_control {
+    label="04 · CONTROL Y EVALUACIÓN";
+    style="rounded,filled";color="#E9D9B4";fillcolor="#FCF7ED";fontcolor="#73582C";
+    rules [label="Guardrails\nLímites · Citas · Abstención",fillcolor="#FFF5D8"];
+    human [label="Revisión humana\nPendiente de aprobación formal",fillcolor="#FFF5D8"];
+    metrics [label="Evaluación offline\nV1 vs V2 · Trayectorias",fillcolor="#FFFFFF"];
+    gt [label="GROUND_TRUTH\nSeparado de inferencia",fillcolor="#FFFFFF"];
+    synthesis -> rules -> human;
+    gt -> metrics [style=dotted];
+    v1 -> metrics [style=dotted];
+  }
+
+  index -> resolver;
+  labelled -> resolver;
+  ui -> resolver [label="V2"];
+  rules -> ui [constraint=false];
+  rules -> metrics [style=dotted];
+}
