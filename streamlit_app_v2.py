@@ -20,6 +20,8 @@ except Exception:
 
 from guardrails import validar_cui
 from universo_v2 import DB_PATH, consultar_proyecto_v2
+from router_cui import consultar_contexto_cui
+from rag_multifuente import DB as RAG_V4_DB
 
 st.set_page_config(
     page_title='Investigador de elegibilidad sostenible | Perú',
@@ -31,13 +33,14 @@ st.caption('Marco del Bono Sostenible del Perú (2021) · Prototipo académico �
 
 with st.sidebar:
     st.header('Evaluación')
-    modo = st.radio('Motor', ['Investigador V2 (agéntico)', 'Clasificador V1 (baseline)'])
+    modo = st.radio('Motor', ['Investigador V4 (3 casos + RAG multifuente)', 'Investigador V3 (planificación y reflexión)', 'Investigador V2 (baseline)', 'Clasificador V1 (baseline)'])
     cui_input = st.text_input('Código Único de Inversión (CUI)', value='2017723')
     st.caption('Datos locales: 423 CUIs históricos, sin etiquetas durante inferencia.')
     if DB_PATH.exists():
         st.success('Universo 2023–2026 indexado disponible')
     else:
         st.info('Universo ampliado opcional: falta preparar la base SQLite local.')
+    st.caption('Biblioteca V4: ' + ('15 documentos indexados' if RAG_V4_DB.exists() else 'sin índice; instalar parche'))
     st.divider()
     st.caption('Las llamadas al modelo usan créditos de API. No hay ejecución automática.')
     inspeccionar = st.button('Consultar ficha (sin IA)', use_container_width=True)
@@ -55,7 +58,7 @@ if inspeccionar or ejecutar:
 
     if inspeccionar:
         try:
-            ficha = consultar_proyecto_v2(cui)
+            ficha = consultar_contexto_cui(cui) if modo.startswith('Investigador V4') else consultar_proyecto_v2(cui)
             if ficha.get('encontrado'):
                 st.success(f'Ficha encontrada: {ficha.get("fuente", "base local")}')
                 st.json(ficha)
@@ -70,7 +73,15 @@ if inspeccionar or ejecutar:
             st.stop()
         try:
             with st.spinner('Investigando: planificación, recuperación y verificación de evidencia...'):
-                if modo.startswith('Investigador'):
+                if modo.startswith('Investigador V4'):
+                    from investigacion_v4 import investigar_cui
+                    resultado = investigar_cui(cui)
+                    st.session_state['respuesta_v2'] = {'modo': 'v4', 'cui': cui, 'estado': resultado}
+                elif modo.startswith('Investigador V3'):
+                    from investigacion_v3 import investigar_cui
+                    resultado = investigar_cui(cui)
+                    st.session_state['respuesta_v2'] = {'modo': 'v3', 'cui': cui, 'estado': resultado}
+                elif modo.startswith('Investigador V2'):
                     from investigacion_v2 import investigar_cui
                     resultado = investigar_cui(cui)
                     st.session_state['respuesta_v2'] = {'modo': 'v2', 'cui': cui, 'estado': resultado}
@@ -84,8 +95,10 @@ if inspeccionar or ejecutar:
 respuesta = st.session_state['respuesta_v2']
 if respuesta:
     estado = respuesta['estado']
-    es_v2 = respuesta['modo'] == 'v2'
-    if es_v2:
+    es_v3 = respuesta['modo'] == 'v3'
+    es_v4 = respuesta['modo'] == 'v4'
+    es_investigador = respuesta['modo'] in ('v2', 'v3', 'v4')
+    if es_investigador:
         d = estado.get('diagnostico', {})
         clasificacion = d.get('clasificacion_preliminar', 'Sin conclusión')
         advertencia = bool(d.get('requiere_revision_humana', True))
@@ -102,8 +115,10 @@ if respuesta:
 
     st.divider()
     st.subheader(f'CUI {respuesta["cui"]} · {clasificacion}')
+    if es_v4:
+        st.info('Caso detectado: ' + str(d.get('caso', estado.get('caso', 'Sin identificar'))) + ' | Orígenes: ' + str(d.get('origenes', {})))
     k1, k2, k3 = st.columns(3)
-    k1.metric('Motor', 'Investigación V2' if es_v2 else 'Clasificación V1')
+    k1.metric('Motor', ('Investigación V4' if es_v4 else ('Investigación V3' if es_v3 else 'Investigación V2')) if es_investigador else 'Clasificación V1')
     k2.metric('Pasos / iteraciones', pasos)
     k3.metric('Revisión humana', 'Sí' if advertencia else 'No')
     if advertencia:
@@ -113,7 +128,7 @@ if respuesta:
         'Diagnóstico', 'Evidencia', 'Plan y trayectoria', 'Datos / exportación',
     ])
     with tab_result:
-        if es_v2:
+        if es_investigador:
             st.write(d.get('explicacion', ''))
             c1, c2 = st.columns(2)
             with c1:
@@ -126,6 +141,13 @@ if respuesta:
                 st.write(d.get('incertidumbres', []))
                 st.markdown('**Documentación requerida**')
                 st.write(d.get('documentacion_requerida', []))
+            if es_v4:
+                st.markdown('**Requisitos expresos del Marco 2021 (cuando recuperados)**')
+                st.write(d.get('requisitos_marco', []))
+                st.markdown('**Recomendaciones de mejora / alineamiento prospectivo**')
+                st.write(d.get('recomendaciones_mejora', []))
+                st.markdown('**Fuentes de contexto recuperadas (no son citas individuales de cada afirmación)**')
+                st.write(d.get('fuentes_contexto', []))
             st.markdown('**Acciones recomendadas**')
             st.write(d.get('acciones_recomendadas', []))
             st.caption(f'Páginas normativas efectivamente recuperadas: {d.get("paginas_marco", [])}')
@@ -139,7 +161,7 @@ if respuesta:
 
     with tab_evidence:
         st.caption('Solo datos del proyecto y documentos recuperados. Nunca etiquetas históricas.')
-        if es_v2:
+        if es_investigador:
             st.json(estado.get('proyecto', {}))
             st.markdown('**Consultas y hallazgos de herramientas**')
             st.json(estado.get('evidencia', []))
@@ -150,9 +172,22 @@ if respuesta:
             st.json(estado.get('tool_outputs', []))
 
     with tab_plan:
-        if es_v2:
+        if es_investigador:
             st.markdown('**Plan final / vigente**')
-            st.write(estado.get('plan', []))
+            if es_v3 or es_v4:
+                tareas = estado.get('plan', [])
+                if tareas:
+                    st.dataframe([
+                        {'Tarea': t['id'], 'Pregunta': t['pregunta'], 'Estado': t['estado'],
+                         'Hallazgo': t.get('hallazgo', ''), 'Evidencia': ', '.join(t.get('evidencia_ids',t.get('evidencias', []))),
+                         'Bloqueo': t.get('motivo_bloqueo', '')} for t in tareas
+                    ], use_container_width=True, hide_index=True)
+                st.caption('Resuelta = evidencia registrada; bloqueada = falta una fuente o se alcanzó un límite.')
+                st.write('**Motivo de cierre:**', estado.get('motivo_cierre', '—'))
+                st.write('**Decisiones del supervisor:**', estado.get('decisiones', 0))
+                st.write('**Revisiones de cierre rechazadas:**', estado.get('cierres_rechazados', 0))
+            else:
+                st.write(estado.get('plan', []))
             st.markdown('**Herramientas utilizadas**')
             st.json(herramientas)
         st.markdown('**Trayectoria auditable**')
@@ -177,7 +212,10 @@ if respuesta:
 else:
     st.info('Ingresa un CUI y consulta su ficha sin IA, o ejecuta una investigación con tu clave OpenAI.')
     st.markdown('''
-**Cómo funciona V2:** el supervisor observa el contexto y decide qué acción realizar. Puede consultar
-normativa, intentar extraer un marco lógico, contrastar hipótesis especializadas o terminar.
-Cada paso queda registrado para comparar su estrategia contra el clasificador V1.
+**Cómo funciona V4:** detecta 3 casos de uso, consulta ambas BBDD por CUI, separa
+criterios del Marco 2021 de políticas e indicadores y propone mejoras para proyectos prospectivos.
+
+**V3:** planifica tareas verificables, elige herramientas, reflexiona
+sobre la evidencia después de cada consulta y audita el cierre de tareas pendientes.
+V1 y V2 permanecen disponibles para comparaciones controladas.
 ''')

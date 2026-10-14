@@ -27,3 +27,15 @@ Data 423 CUIs.xlsx
 .venv/
 outputs/
 __pycache__/
+
+# Datos locales y credenciales
+.env
+.env.*
+!.env.example
+data/*.sqlite
+data/*.sqlite*
+data/*.xlsx
+data/*.csv
+data/*.pdf
+data/marcos_logicos/
+*.zip
